@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+src/logs/*
+!src/logs/.gitkeep
+logs/
+*.log
+
+# Uploads (runtime artifacts — never commit user content)
+src/uploads/*
+!src/uploads/.gitkeep
+uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Build / coverage
+dist/
+build/
+coverage/
+.nyc_output/
+
+# Docker volumes (if mounted locally)
+docker/data/
+
+# Tooling-local config (Claude Code workspace settings)
+.claude/
+
+# Tesseract language data — downloaded at runtime by tesseract.js
+eng.traineddata
