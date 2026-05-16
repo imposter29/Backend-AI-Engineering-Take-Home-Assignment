@@ -1,0 +1,88 @@
+# ----------------------------------------------------------------------
+# docker-compose for the Intelligent Media Processing Pipeline.
+#
+# Services:
+#   - api       : Express HTTP server (POST /upload, GET /status, GET /results)
+#   - worker    : BullMQ worker that consumes the image-processing queue
+#   - mongo     : MongoDB 7 (metadata + analysis results store)
+#   - redis     : Redis 7 (BullMQ broker)
+#
+# The api and worker share the same Docker image — they only differ in
+# their startup command. This mirrors how the system would scale in
+# production: HTTP and worker pools scale independently.
+# ----------------------------------------------------------------------
+
+services:
+  api:
+    build: .
+    container_name: media-pipeline-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/media_pipeline
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - ./src/uploads:/app/src/uploads
+      - ./src/logs:/app/src/logs
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["node", "src/server.js"]
+
+  worker:
+    build: .
+    container_name: media-pipeline-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/media_pipeline
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./src/uploads:/app/src/uploads
+      - ./src/logs:/app/src/logs
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["node", "src/workers/index.js"]
+
+  mongo:
+    image: mongo:7
+    container_name: media-pipeline-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: media-pipeline-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo_data:
+  redis_data:
