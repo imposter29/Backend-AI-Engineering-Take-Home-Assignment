@@ -34,8 +34,12 @@ const log = logger.child({ component: 'ocr' });
 
 const CHAR_WHITELIST = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 // Upscale small/mid-resolution photos so plate glyphs land in Tesseract's
-// sweet spot (~30–50px tall). Larger inputs are left alone.
-const TARGET_MIN_WIDTH = 1600;
+// sweet spot (~30–50px tall). Larger inputs are left alone. Lowered from
+// 1600 to keep preprocessing buffers small enough for Render's 512 MB
+// free-tier RAM cap; accuracy regression is negligible on phone-sized
+// inputs (already >1200 wide), and Tesseract still has enough resolution
+// to recognise plate glyphs.
+const TARGET_MIN_WIDTH = 1200;
 // Below this Tesseract confidence, the substring extractor was matching
 // hallucinated character runs that happened to fit the plate regex
 // (e.g. "TN25FH8344" pulled from grille noise). Tune up to reduce false
@@ -300,10 +304,16 @@ const recognise = async (buffer, psm) => {
 
 // Plates inside vehicle photos are sparse text in a busy scene, so PSM 11
 // finds them best. PSM 7 (single line) is the fallback for tight crops
-// where the plate fills the frame. PSM 8 (single word) often outperforms
-// 7 on small heavily-compressed plate close-ups where Tesseract's line
-// segmenter splits the text into multiple fragments.
-const PSM_MODES = [PSM.SPARSE_TEXT, PSM.SINGLE_LINE, PSM.SINGLE_WORD, PSM.SINGLE_BLOCK];
+// where the plate fills the frame.
+//
+// We previously kept four persistent PSM workers (SPARSE / SINGLE_LINE /
+// SINGLE_WORD / SINGLE_BLOCK) for marginal accuracy gains on edge cases.
+// Each worker loads the ~50 MB English language model and stays
+// resident, which on Render's 512 MB free tier crowded out the
+// preprocessing/Sharp buffers and OOM-killed the process under load.
+// Dropping to two PSMs cuts ~100 MB of always-resident memory; the
+// remaining two cover the dominant cases (scene photos + tight crops).
+const PSM_MODES = [PSM.SPARSE_TEXT, PSM.SINGLE_LINE];
 
 const scoreCandidate = (candidate) => {
   const { extractedText, confidence } = candidate;

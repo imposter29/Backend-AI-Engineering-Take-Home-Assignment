@@ -56,12 +56,14 @@ services:
       - key: REDIS_DB
         value: 0
 
-      # Queue + worker tuning. Concurrency=2 keeps memory under the
-      # free-tier 512 MB cap when Tesseract workers are warm.
+      # Queue + worker tuning. Concurrency=1 on Render's 512 MB free tier
+      # so one image's transient Sharp + Tesseract scratch memory can't
+      # collide with another and trip the OOM killer. Bump to 2-4 on a
+      # paid plan where memory is comfortable.
       - key: IMAGE_QUEUE_NAME
         value: image-processing
       - key: WORKER_CONCURRENCY
-        value: 2
+        value: 1
       - key: JOB_ATTEMPTS
         value: 3
       - key: JOB_BACKOFF_MS
