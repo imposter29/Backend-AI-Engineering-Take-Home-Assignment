@@ -276,6 +276,36 @@ curl http://localhost:3000/api/v1/results/<uuid>
 
 ---
 
+## Deployment
+
+This repo ships with a one-click deployment path: **backend + Redis on Render** ([render.yaml](render.yaml) Blueprint) and **frontend on Vercel**. MongoDB stays on Atlas.
+
+### Backend on Render
+
+1. **Rotate the MongoDB Atlas password.** The repo's local `.env` carries a development-only credential; do not reuse it for the deployed service.
+2. In Render, **New + → Blueprint**, point at the repo's `main` branch. Render reads `render.yaml` and provisions one Web Service (`media-pipeline-api`) and one managed Redis instance (`media-pipeline-redis`).
+3. Set the two **`sync: false` secrets** in the dashboard before the first deploy completes:
+   - `MONGO_URI` — the rotated Atlas connection string
+   - `CORS_ORIGIN` — leave blank for now; you'll set it to the Vercel URL in step 6
+4. Wait for the build to finish; note the assigned URL, e.g. `https://media-pipeline-api.onrender.com`. Hit `/health` to verify Mongo and Redis are both green.
+5. **Free-tier caveat:** the service spins down after 15 minutes of inactivity and cold-boots in ~30 seconds on the next request. The reviewer's first hit may be slow — subsequent ones are fast.
+
+### Frontend on Vercel
+
+1. In Vercel, **Add New + → Project**, import the repo.
+2. **Root Directory**: `frontend`. **Framework Preset**: Vite (auto-detected).
+3. Add one **environment variable**: `VITE_API_BASE_URL` = `https://<your-render-url>/api/v1` (from step 4 above).
+4. Deploy. Vercel assigns a URL like `https://<your-app>.vercel.app`.
+5. Go back to Render and update **`CORS_ORIGIN`** to the Vercel URL. Trigger a manual redeploy so the new env var is picked up.
+
+### Caveats baked into this deployment
+
+- **Uploads live on ephemeral disk.** Render's free tier has no persistent volume, so any image uploaded against the deployed backend is lost on the next deploy or container restart. Fine for a demo; production would need an S3/R2 adapter — the multer middleware is isolated for exactly that swap.
+- **Worker runs in-process** (`START_WORKER_IN_API=true`). Render's free tier doesn't include separate Background Worker services, and a take-home demo doesn't need the failure-isolation that a dedicated worker process buys. For real production, set `START_WORKER_IN_API=false` and add a second service of `type: worker` to [render.yaml](render.yaml) running `npm run worker` — adds ~$7/mo on Render.
+- **MongoDB Atlas free tier (M0)** is shared and has a connection cap. Fine for one demo, not for load testing.
+
+---
+
 ## Docker
 
 ```bash

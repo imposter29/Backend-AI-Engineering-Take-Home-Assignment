@@ -1,0 +1,91 @@
+# Render Blueprint — deploys the API (with the worker running in-process)
+# and a managed Redis instance. MongoDB stays on Atlas.
+#
+# Demo simplification: the API and worker share one process via
+# START_WORKER_IN_API=true. Render's free tier does not include
+# Background Workers ($7/mo each), and a take-home demo doesn't need
+# the failure-isolation that a separate worker process buys. For real
+# production: set START_WORKER_IN_API=false here, add a second service
+# of `type: worker` running `npm run worker`, and bill ~$7/mo.
+#
+# Secrets (MONGO_URI, CORS_ORIGIN) use `sync: false` so they aren't
+# committed to the repo — set them in the Render dashboard the first
+# time you deploy.
+
+services:
+  - type: web
+    name: media-pipeline-api
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: .
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: API_PREFIX
+        value: /api/v1
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_DIR
+        value: src/logs
+
+      # MongoDB Atlas — set in the dashboard the first time you deploy.
+      # Rotate the password in Atlas before pasting the connection string.
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: internshipAssignment
+
+      # Redis is provisioned below; wire host + port automatically.
+      - key: REDIS_HOST
+        fromService:
+          name: media-pipeline-redis
+          type: keyvalue
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: media-pipeline-redis
+          type: keyvalue
+          property: port
+      - key: REDIS_DB
+        value: 0
+
+      # Queue + worker tuning. Concurrency=2 keeps memory under the
+      # free-tier 512 MB cap when Tesseract workers are warm.
+      - key: IMAGE_QUEUE_NAME
+        value: image-processing
+      - key: WORKER_CONCURRENCY
+        value: 2
+      - key: JOB_ATTEMPTS
+        value: 3
+      - key: JOB_BACKOFF_MS
+        value: 5000
+      - key: START_WORKER_IN_API
+        value: true
+
+      # Uploads land on ephemeral disk — files vanish on redeploy.
+      # Documented in the README's Known Limitations section.
+      - key: UPLOAD_DIR
+        value: src/uploads
+      - key: MAX_UPLOAD_BYTES
+        value: 10485760
+      - key: ALLOWED_MIME_TYPES
+        value: image/jpeg,image/png,image/webp
+
+      # Set to your Vercel URL after the frontend is deployed:
+      #   https://<your-app>.vercel.app
+      - key: CORS_ORIGIN
+        sync: false
+
+  - type: keyvalue
+    name: media-pipeline-redis
+    plan: free
+    region: oregon
+    # Restrict to in-Render traffic only; the API uses internal addressing.
+    ipAllowList: []

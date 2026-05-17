@@ -7,13 +7,20 @@
  * (with `.status`, `.code`, `.requestId`) on failure.
  *
  * In dev, Vite proxies /api -> http://localhost:3000 (see vite.config.js),
- * so the same code works in dev and prod without env switching.
+ * so the default same-origin baseURL just works.
+ *
+ * In prod (Vercel) the frontend is served from a different origin than
+ * the API (Render). Setting VITE_API_BASE_URL at build time switches
+ * axios to call the API absolute URL directly — the Render backend must
+ * then allow that origin in CORS_ORIGIN.
  */
 
 import axios from 'axios';
 
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+
 const client = axios.create({
-  baseURL: '/api/v1',
+  baseURL,
   timeout: 30_000,
 });
 
