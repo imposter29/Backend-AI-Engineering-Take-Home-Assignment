@@ -16,17 +16,27 @@ import { logger } from '../utils/logger.js';
 
 const log = logger.child({ component: 'redis' });
 
+// Required by BullMQ for blocking commands; harmless for everything else.
+const bullmqRequired = {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: true,
+  lazyConnect: false,
+};
+
 export const createRedisConnection = (label = 'generic') => {
-  const conn = new IORedis({
-    host: config.redis.host,
-    port: config.redis.port,
-    password: config.redis.password,
-    db: config.redis.db,
-    // Required by BullMQ for blocking commands; harmless for everything else.
-    maxRetriesPerRequest: null,
-    enableReadyCheck: true,
-    lazyConnect: false,
-  });
+  // Managed providers (Upstash, Render Key Value, ElastiCache) give a
+  // single URL. ioredis accepts that URL directly and auto-enables TLS
+  // when the scheme is `rediss://`. Fall back to discrete host/port for
+  // local Docker compose, which has no URL to hand out.
+  const conn = config.redis.url
+    ? new IORedis(config.redis.url, bullmqRequired)
+    : new IORedis({
+        host: config.redis.host,
+        port: config.redis.port,
+        password: config.redis.password,
+        db: config.redis.db,
+        ...bullmqRequired,
+      });
 
   conn.on('connect', () => log.info('redis connected', { label }));
   conn.on('ready', () => log.debug('redis ready', { label }));

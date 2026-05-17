@@ -40,6 +40,12 @@ const envSchema = Joi.object({
   MONGO_DB_NAME: Joi.string().default('media_pipeline'),
 
   // Redis
+  // Prefer a single REDIS_URL when set — managed providers (Upstash,
+  // Render Key Value, ElastiCache) hand out one. `rediss://` URLs
+  // auto-enable TLS in ioredis. The discrete host/port/password vars
+  // are kept as a fallback for local Docker compose where there's no
+  // URL to pass.
+  REDIS_URL: Joi.string().uri({ scheme: ['redis', 'rediss'] }).optional(),
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().port().default(6379),
   REDIS_PASSWORD: Joi.string().allow('').default(''),
@@ -100,6 +106,7 @@ export const env = Object.freeze({
   },
 
   redis: {
+    url: value.REDIS_URL,
     host: value.REDIS_HOST,
     port: value.REDIS_PORT,
     password: value.REDIS_PASSWORD || undefined,
