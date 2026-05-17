@@ -4,6 +4,13 @@ Production-style backend + dashboard for asynchronous image upload, multi-stage 
 
 The HTTP API and the BullMQ worker are **separate processes** sharing one Docker image — they scale independently and isolate failure domains. A React dashboard sits on top of the same API for an end-to-end demo.
 
+## Live demo
+
+- **Dashboard**: <https://backend-ai-engineering-take-home-as.vercel.app/>
+- **API**: <https://media-pipeline-api.onrender.com> · health: [`/health`](https://media-pipeline-api.onrender.com/health)
+
+> First request after ~15 min of inactivity cold-boots in ~30 s — Render free tier spins the service down when idle. Subsequent requests are fast.
+
 ---
 
 ## Stack
