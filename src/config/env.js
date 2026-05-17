@@ -128,6 +128,15 @@ export const env = Object.freeze({
   },
 
   cors: {
-    origin: value.CORS_ORIGIN,
+    // CORS_ORIGIN is a comma-separated allowlist. Each entry can be:
+    //   - "*"                        wildcard, allows any origin
+    //   - "https://foo.example.com"  literal origin match
+    //   - "https://*.vercel.app"     suffix pattern, matches any subdomain
+    // Trailing slashes are stripped — browsers never send them in the
+    // Origin header, so a literal "https://x.com/" would never match.
+    origins: value.CORS_ORIGIN
+      .split(',')
+      .map((s) => s.trim().replace(/\/+$/, ''))
+      .filter(Boolean),
   },
 });

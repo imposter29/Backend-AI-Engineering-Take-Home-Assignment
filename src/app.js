@@ -44,7 +44,27 @@ export const createApp = () => {
   // Helmet's default CORP would block <img src="..."> from a different origin
   // (the frontend dev server). Loosen just that header — everything else stays on.
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-  app.use(cors({ origin: config.cors.origin }));
+  // Function-based CORS origin so we can support comma-separated lists
+  // and "*.vercel.app"-style suffix patterns (Vercel hands out a new
+  // preview URL per commit; hardcoding one breaks the next deploy).
+  const corsOrigin = (origin, cb) => {
+    // No Origin header — same-origin request, curl, server-to-server.
+    // Always allow; CORS only protects cross-origin browser requests.
+    if (!origin) return cb(null, true);
+    for (const pattern of config.cors.origins) {
+      if (pattern === '*') return cb(null, true);
+      if (pattern === origin) return cb(null, true);
+      if (pattern.startsWith('https://*.') || pattern.startsWith('http://*.')) {
+        const suffix = pattern.slice(pattern.indexOf('*.') + 1); // ".vercel.app"
+        const scheme = pattern.split('://')[0] + '://';
+        if (origin.startsWith(scheme) && origin.endsWith(suffix)) {
+          return cb(null, true);
+        }
+      }
+    }
+    return cb(new Error(`CORS blocked: origin ${origin} not in allowlist`));
+  };
+  app.use(cors({ origin: corsOrigin }));
   app.use(compression());
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
