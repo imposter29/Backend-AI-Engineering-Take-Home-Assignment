@@ -33,7 +33,7 @@ export const Header = () => {
           </div>
         </div>
         <a
-          href="https://github.com"
+          href="https://github.com/imposter29/Backend-AI-Engineering-Take-Home-Assignment"
           target="_blank"
           rel="noreferrer"
           className="hidden text-xs font-medium text-slate-500 hover:text-slate-900 sm:block"
